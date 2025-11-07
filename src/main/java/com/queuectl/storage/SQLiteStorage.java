@@ -78,7 +78,7 @@ public class SQLiteStorage implements JobRepository {
         }
         return out;
     }
-
+    
     private Job rowToJob(ResultSet rs) throws SQLException {
         String id = rs.getString("id");
         String cmd = rs.getString("command");
