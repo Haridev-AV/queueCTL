@@ -52,7 +52,7 @@ public class Worker implements Runnable {
         System.out.println("Worker " + workerId + " stopped gracefully.");
     }
 
-    private void handleRetry(Job job) throws InterruptedException {
+    private void handleRetry(Job job) throws Exception {  // Add Exception here
         int attempts = job.getAttempts() + 1;
         job.setAttempts(attempts);
         repository.updateJobAttempts(job.getId(), attempts);

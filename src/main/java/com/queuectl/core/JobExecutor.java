@@ -15,6 +15,7 @@ public class JobExecutor {
     }
 
     public void execute(Job job) {
+    try {
         repository.updateJobState(job.getId(), JobState.PROCESSING);
         Process process = null;
         StringBuilder output = new StringBuilder();
@@ -46,10 +47,14 @@ public class JobExecutor {
         } catch (IOException | InterruptedException e) {
             repository.updateJobState(job.getId(), JobState.FAILED);
             repository.updateJobOutput(job.getId(), e.getMessage());
-            System.err.println("⚠️ Job " + job.getId() + " failed due to: " + e.getMessage());
+            System.err.println("Job " + job.getId() + " failed due to: " + e.getMessage());
             Thread.currentThread().interrupt();
         } finally {
             if (process != null) process.destroy();
         }
+    } catch (Exception e) {
+        System.err.println("Repository error for job " + job.getId() + ": " + e.getMessage());
+        e.printStackTrace();
     }
+}
 }

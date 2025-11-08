@@ -11,12 +11,12 @@ public interface JobRepository {
     void save(Job job) throws Exception;
     Optional<Job> findById(String id) throws Exception;
     List<Job> listByState(JobState state) throws Exception;
-    void updateJobState(String jobId, JobState state);
-    void updateJobOutput(String jobId, String output);
-    Optional<Job> fetchNextPendingJob();
-    JobState getJobState(String jobId);
-    void updateJobAttempts(String jobId, int attempts);
-    void moveToDLQ(Job job);
+    void updateJobState(String jobId, JobState state) throws Exception;
+    void updateJobOutput(String jobId, String output) throws Exception;
+    JobState getJobState(String jobId) throws Exception;
+    void updateJobAttempts(String jobId, int attempts) throws Exception;
+    void moveToDLQ(Job job) throws Exception;
+    Optional<Job> fetchNextPendingJob() throws Exception;
 
 
 }
