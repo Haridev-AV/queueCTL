@@ -8,9 +8,7 @@ import com.queuectl.core.JobState;
 import com.queuectl.storage.JobRepository;
 import com.queuectl.storage.SQLiteStorage;
 import com.queuectl.core.WorkerPool;
-
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class CommandHandler {
     private final JobRepository repo;

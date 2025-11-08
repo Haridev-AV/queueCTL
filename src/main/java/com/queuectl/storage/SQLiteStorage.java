@@ -193,19 +193,24 @@ public class SQLiteStorage implements JobRepository {
 
     @Override
     public void moveToDLQ(Job job) throws Exception {
-        String sql = "INSERT INTO dlq (id, command, reason, failed_at) VALUES (?, ?, ?, ?)";
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+        String reason = job.getLastError() != null ? job.getLastError() : "Exceeded max retries";
+
+        try (Connection c = conn();
+            PreparedStatement ps = c.prepareStatement(
+                "INSERT INTO dlq (id, command, reason, failed_at) VALUES (?, ?, ?, ?)")) {
             ps.setString(1, job.getId());
             ps.setString(2, job.getCommand());
-            ps.setString(3, "Exceeded max retries");
+            ps.setString(3, reason);
             ps.setString(4, Instant.now().toString());
             ps.executeUpdate();
         }
 
-        // Optionally, delete from main jobs table
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement("DELETE FROM jobs WHERE id = ?")) {
+        // Remove from main jobs table
+        try (Connection c = conn();
+            PreparedStatement ps = c.prepareStatement("DELETE FROM jobs WHERE id = ?")) {
             ps.setString(1, job.getId());
             ps.executeUpdate();
         }
     }
+
 }
