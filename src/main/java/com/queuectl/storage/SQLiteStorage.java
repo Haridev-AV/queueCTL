@@ -19,7 +19,11 @@ public class SQLiteStorage implements JobRepository {
     }
 
     private Connection conn() throws SQLException {
-        return DriverManager.getConnection(dbUrl);
+        Connection c = DriverManager.getConnection(dbUrl);
+        try (Statement st = c.createStatement()) {
+            st.executeUpdate("PRAGMA busy_timeout=5000;");
+        }
+        return c;
     }
 
     @Override
@@ -31,6 +35,8 @@ public class SQLiteStorage implements JobRepository {
         }
         try (Connection c = conn(); Statement st = c.createStatement()) {
             st.executeUpdate("PRAGMA journal_mode=WAL;");
+            st.executeUpdate("PRAGMA busy_timeout=5000;");
+            st.executeUpdate("PRAGMA synchronous=NORMAL;");
             for (String stmt : schema.split(";")) {
                 String s = stmt.trim();
                 if (!s.isEmpty()) st.executeUpdate(s + ";");
@@ -92,81 +98,114 @@ public class SQLiteStorage implements JobRepository {
         return j;
     }
 
-
-@Override
-public void updateJobState(String id, JobState state) throws Exception {
-    String sql = "UPDATE jobs SET state = ?, updated_at = ? WHERE id = ?";
-    try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
-        ps.setString(1, state.name());
-        ps.setString(2, Instant.now().toString());
-        ps.setString(3, id);
-        ps.executeUpdate();
-    }
-}
-
-@Override
-public void updateJobOutput(String id, String output) throws Exception {
-    String sql = "UPDATE jobs SET output = ?, updated_at = ? WHERE id = ?";
-    try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
-        ps.setString(1, output);
-        ps.setString(2, Instant.now().toString());
-        ps.setString(3, id);
-        ps.executeUpdate();
-    }
-}
-
-@Override
-public JobState getJobState(String id) throws Exception {
-    String sql = "SELECT state FROM jobs WHERE id = ?";
-    try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
-        ps.setString(1, id);
-        var rs = ps.executeQuery();
-        if (rs.next()) {
-            return JobState.valueOf(rs.getString("state"));
-        } else {
-            throw new RuntimeException("Job not found: " + id);
+    @Override
+    public void updateJobState(String id, JobState state) throws Exception {
+        String sql = "UPDATE jobs SET state = ?, updated_at = ? WHERE id = ?";
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, state.name());
+            ps.setString(2, Instant.now().toString());
+            ps.setString(3, id);
+            ps.executeUpdate();
         }
     }
-}
 
-@Override
-public void updateJobAttempts(String id, int attempts) throws Exception {
-    String sql = "UPDATE jobs SET attempts = ?, updated_at = ? WHERE id = ?";
-    try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
-        ps.setInt(1, attempts);
-        ps.setString(2, Instant.now().toString());
-        ps.setString(3, id);
-        ps.executeUpdate();
-    }
-}
-
-@Override
-public Optional<Job> fetchNextPendingJob() throws Exception {
-    String sql = "SELECT * FROM jobs WHERE state = 'PENDING' ORDER BY created_at LIMIT 1";
-    try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
-        var rs = ps.executeQuery();
-        if (rs.next()) {
-            return Optional.of(rowToJob(rs));
+    @Override
+    public void updateJobOutput(String id, String output) throws Exception {
+        String sql = "UPDATE jobs SET output = ?, updated_at = ? WHERE id = ?";
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, output);
+            ps.setString(2, Instant.now().toString());
+            ps.setString(3, id);
+            ps.executeUpdate();
         }
     }
-    return Optional.empty();
-}
 
-@Override
-public void moveToDLQ(Job job) throws Exception {
-    String sql = "INSERT INTO dlq (id, command, reason, failed_at) VALUES (?, ?, ?, ?)";
-    try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
-        ps.setString(1, job.getId());
-        ps.setString(2, job.getCommand());
-        ps.setString(3, "Exceeded max retries");
-        ps.setString(4, Instant.now().toString());
-        ps.executeUpdate();
+    @Override
+    public JobState getJobState(String id) throws Exception {
+        String sql = "SELECT state FROM jobs WHERE id = ?";
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, id);
+            var rs = ps.executeQuery();
+            if (rs.next()) {
+                return JobState.valueOf(rs.getString("state"));
+            } else {
+                throw new RuntimeException("Job not found: " + id);
+            }
+        }
     }
 
-    // Optionally, delete from main jobs table
-    try (Connection c = conn(); PreparedStatement ps = c.prepareStatement("DELETE FROM jobs WHERE id = ?")) {
-        ps.setString(1, job.getId());
-        ps.executeUpdate();
+    @Override
+    public void updateJobAttempts(String id, int attempts) throws Exception {
+        String sql = "UPDATE jobs SET attempts = ?, updated_at = ? WHERE id = ?";
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, attempts);
+            ps.setString(2, Instant.now().toString());
+            ps.setString(3, id);
+            ps.executeUpdate();
+        }
     }
-}
+
+    @Override
+    public Optional<Job> fetchNextPendingJob() throws Exception {
+        String selectSql = "SELECT * FROM jobs WHERE state = 'PENDING' ORDER BY created_at LIMIT 1";
+        String updateSql = "UPDATE jobs SET state = 'RUNNING', updated_at = ? WHERE id = ? AND state = 'PENDING'";
+        
+        int maxRetries = 3;
+        for (int attempt = 0; attempt < maxRetries; attempt++) {
+            try (Connection c = conn()) {
+                c.setAutoCommit(false);
+                
+                try (PreparedStatement selectPs = c.prepareStatement(selectSql)) {
+                    var rs = selectPs.executeQuery();
+                    if (!rs.next()) {
+                        c.rollback();
+                        return Optional.empty();
+                    }
+                    
+                    String jobId = rs.getString("id");
+                    
+                    try (PreparedStatement updatePs = c.prepareStatement(updateSql)) {
+                        updatePs.setString(1, Instant.now().toString());
+                        updatePs.setString(2, jobId);
+                        int updated = updatePs.executeUpdate();
+                        
+                        if (updated == 0) {
+                            // Another worker claimed it first
+                            c.rollback();
+                            return Optional.empty();
+                        }
+                        
+                        c.commit();
+                        return Optional.of(rowToJob(rs));
+                    }
+                } catch (SQLException e) {
+                    c.rollback();
+                    if (e.getMessage().contains("locked") && attempt < maxRetries - 1) {
+                        Thread.sleep(100 * (attempt + 1));
+                        continue;
+                    }
+                    throw e;
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public void moveToDLQ(Job job) throws Exception {
+        String sql = "INSERT INTO dlq (id, command, reason, failed_at) VALUES (?, ?, ?, ?)";
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, job.getId());
+            ps.setString(2, job.getCommand());
+            ps.setString(3, "Exceeded max retries");
+            ps.setString(4, Instant.now().toString());
+            ps.executeUpdate();
+        }
+
+        // Optionally, delete from main jobs table
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement("DELETE FROM jobs WHERE id = ?")) {
+            ps.setString(1, job.getId());
+            ps.executeUpdate();
+        }
+    }
 }
