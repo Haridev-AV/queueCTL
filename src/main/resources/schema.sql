@@ -2,16 +2,16 @@ CREATE TABLE IF NOT EXISTS jobs (
     id TEXT PRIMARY KEY,
     command TEXT NOT NULL,
     state TEXT NOT NULL,
-    attempts INTEGER NOT NULL DEFAULT 0,
-    max_retries INTEGER NOT NULL DEFAULT 3,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    next_run_at TEXT,
+    retries INTEGER DEFAULT 0,
+    max_retries INTEGER DEFAULT 3,
     last_error TEXT,
-    output TEXT
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS config (
-    key TEXT PRIMARY KEY,
-    value TEXT
+CREATE TABLE IF NOT EXISTS dlq (
+    id TEXT PRIMARY KEY,
+    command TEXT NOT NULL,
+    reason TEXT,
+    failed_at TEXT DEFAULT CURRENT_TIMESTAMP
 );

@@ -131,4 +131,34 @@ public class CommandHandler {
         cfg.set(key, value);
         System.out.printf("Updated config: %s = %s%n", key, value);
     }
+
+    private WorkerPool workerPool;
+
+    public void startWorkers(int count) throws Exception {
+        if (workerPool == null) {
+            int baseBackoff = ConfigManager.getInstance().getInt("base_backoff_ms", 1000);
+            workerPool = new WorkerPool(repo, count, baseBackoff);
+            workerPool.start();
+        } else {
+            System.out.println("Workers already running!");
+        }
+    }
+
+    public void stopWorkers() {
+        if (workerPool != null) {
+            workerPool.stop();
+            workerPool = null;
+        } else {
+            System.out.println("No workers are running.");
+        }
+    }
+
+    public void showStatus() {
+        if (workerPool != null) {
+            System.out.println("Active workers: " + workerPool.getActiveWorkerCount());
+        } else {
+            System.out.println("No workers are currently running.");
+        }
+    }
+
 }
