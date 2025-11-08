@@ -24,7 +24,7 @@ public class WorkerPool {
 
 
     public void start() {
-        System.out.println("🚀 Starting " + workerCount + " worker(s)...");
+        System.out.println("Starting " + workerCount + " worker(s)...");
         for (int i = 1; i <= workerCount; i++) {
             Worker worker = new Worker("worker-" + i, repository, baseBackoff);
             workers.add(worker);
