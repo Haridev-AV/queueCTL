@@ -1,5 +1,7 @@
 # QueueCTL - Lightweight Job Queue System
 
+[Watch the video demo](https://drive.google.com/drive/folders/1GwXbVHfRCVN14URDeGmZEiu5ogTpsFqq?usp=drive_link)
+
 A simple persistent job queue implementation in Java that processes shell commands with retry logic and dead letter queue support.
 
 ## Features
