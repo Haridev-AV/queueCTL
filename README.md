@@ -92,6 +92,7 @@ queuectl -w 2
 # Add some jobs
 queuectl -e "{\"command\":\"echo Task 1\"}"
 queuectl -e "{\"command\":\"echo Task 2\"}"
+queuectl --enqueue "{\"command\":\"cmd /c exit 1\"}"
 
 # Check status
 queuectl -s
