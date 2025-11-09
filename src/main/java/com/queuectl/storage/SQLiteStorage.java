@@ -213,4 +213,14 @@ public class SQLiteStorage implements JobRepository {
         }
     }
 
+    @Override
+    public void deleteJobById(String jobId) throws Exception {
+        String sql = "DELETE FROM jobs WHERE id = ?";
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, jobId);
+            ps.executeUpdate();
+        }
+}
+
+
 }

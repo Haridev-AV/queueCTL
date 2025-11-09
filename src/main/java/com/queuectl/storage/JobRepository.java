@@ -17,6 +17,7 @@ public interface JobRepository {
     void updateJobAttempts(String jobId, int attempts) throws Exception;
     void moveToDLQ(Job job) throws Exception;
     Optional<Job> fetchNextPendingJob() throws Exception;
+    void deleteJobById(String jobId) throws Exception;
 
 
 }

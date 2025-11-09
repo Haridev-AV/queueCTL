@@ -103,25 +103,29 @@ public class CommandHandler {
     }
 
     public void handleDLQRetry(String jobId) throws Exception {
-        Optional<Job> jobOpt = repo.findById(jobId);
-        if (jobOpt.isEmpty()) {
-            System.err.println("Job not found: " + jobId);
-            return;
-        }
-
-        Job job = jobOpt.get();
-        if (job.getState() != JobState.DEAD) {
-            System.out.println("Job is not in DLQ. Current state: " + job.getState());
-            return;
-        }
-
-        job.setState(JobState.PENDING);
-        job.setAttempts(0);
-        job.setLastError(null);
-        repo.save(job);
-
-        System.out.printf("Moved job %s back to queue for retry.%n", job.getId());
+    Optional<Job> jobOpt = repo.findById(jobId);
+    if (jobOpt.isEmpty()) {
+        System.err.println("Job not found: " + jobId);
+        return;
     }
+
+    Job job = jobOpt.get();
+    if (job.getState() != JobState.DEAD) {
+        System.out.println("Job is not in DLQ. Current state: " + job.getState());
+        return;
+    }
+
+    repo.deleteJobById(job.getId());
+
+    job.setState(JobState.PENDING);
+    job.setAttempts(0);
+    job.setLastError(null);
+
+    repo.save(job);
+
+    System.out.printf("Moved job %s back to queue for retry.%n", job.getId());
+}
+
 
 
     public void handleConfigSet(String key, String value) throws Exception {
