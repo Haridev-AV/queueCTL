@@ -1,4 +1,4 @@
-# queueCTL# QueueCTL - Lightweight Job Queue System
+# QueueCTL - Lightweight Job Queue System
 
 A simple persistent job queue implementation in Java that processes shell commands with retry logic and dead letter queue support.
 
