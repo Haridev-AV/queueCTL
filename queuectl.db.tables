@@ -1,0 +1,6 @@
+CREATE TABLE dlq (
+    id TEXT PRIMARY KEY,
+    command TEXT,
+    reason TEXT,
+    failed_at TEXT
+);

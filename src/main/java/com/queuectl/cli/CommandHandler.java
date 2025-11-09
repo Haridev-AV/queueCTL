@@ -87,36 +87,32 @@ public class CommandHandler {
     }
 
     public void handleDLQList() throws Exception {
-        List<Job> dlqJobs = repo.listByState(JobState.DEAD);
-        if (dlqJobs.isEmpty()) {
-            System.out.println("No jobs in Dead Letter Queue.");
-            return;
-        }
-
-        System.out.println("Dead Letter Queue Jobs:");
-        System.out.println("--------------------------------------------------");
-        for (Job job : dlqJobs) {
-            System.out.printf("ID: %-10s | CMD: %-20s | LastError: %s%n",
-                    job.getId(), job.getCommand(),
-                    job.getLastError() == null ? "-" : job.getLastError());
-        }
+    List<Job> dlqJobs = repo.listDLQ();  // CHANGED THIS LINE
+    if (dlqJobs.isEmpty()) {
+        System.out.println("No jobs in Dead Letter Queue.");
+        return;
     }
 
+    System.out.println("Dead Letter Queue Jobs:");
+    System.out.println("--------------------------------------------------");
+    for (Job job : dlqJobs) {
+        System.out.printf("ID: %-36s | CMD: %-30s%n",
+                job.getId(), job.getCommand());
+    }
+}
     public void handleDLQRetry(String jobId) throws Exception {
-    Optional<Job> jobOpt = repo.findById(jobId);
+    Optional<Job> jobOpt = repo.findInDLQ(jobId); // CHANGED
     if (jobOpt.isEmpty()) {
-        System.err.println("Job not found: " + jobId);
+        System.err.println("Job not found in DLQ: " + jobId);
         return;
     }
 
     Job job = jobOpt.get();
-    if (job.getState() != JobState.DEAD) {
-        System.out.println("Job is not in DLQ. Current state: " + job.getState());
-        return;
-    }
+    
+    // Remove from DLQ
+    repo.deleteFromDLQ(job.getId()); // CHANGED
 
-    repo.deleteJobById(job.getId());
-
+    // Reset for retry
     job.setState(JobState.PENDING);
     job.setAttempts(0);
     job.setLastError(null);

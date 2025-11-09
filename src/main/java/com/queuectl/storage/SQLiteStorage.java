@@ -220,7 +220,52 @@ public class SQLiteStorage implements JobRepository {
             ps.setString(1, jobId);
             ps.executeUpdate();
         }
+    }
+
+
+    @Override
+public List<Job> listDLQ() throws Exception {
+    String sql = "SELECT id, command FROM dlq ORDER BY failed_at DESC";
+    List<Job> out = new ArrayList<>();
+    try (Connection c = conn(); 
+         PreparedStatement ps = c.prepareStatement(sql)) {
+        var rs = ps.executeQuery();
+        while (rs.next()) {
+            String id = rs.getString("id");
+            String command = rs.getString("command");
+            Job job = new Job(id, command, 0);
+            job.setState(JobState.DEAD);
+            out.add(job);
+        }
+    }
+    return out;
 }
+
+@Override
+public Optional<Job> findInDLQ(String id) throws Exception {
+    String sql = "SELECT id, command FROM dlq WHERE id = ?";
+    try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+        ps.setString(1, id);
+        var rs = ps.executeQuery();
+        if (!rs.next()) return Optional.empty();
+        
+        String jobId = rs.getString("id");
+        String command = rs.getString("command");
+        Job job = new Job(jobId, command, 3); // Default max_retries
+        job.setState(JobState.DEAD);
+        return Optional.of(job);
+    }
+}
+
+    @Override
+public void deleteFromDLQ(String jobId) throws Exception {
+    String sql = "DELETE FROM dlq WHERE id = ?";
+    try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+        ps.setString(1, jobId);
+        ps.executeUpdate();
+    }
+}
+    
 
 
 }

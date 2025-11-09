@@ -18,6 +18,8 @@ public interface JobRepository {
     void moveToDLQ(Job job) throws Exception;
     Optional<Job> fetchNextPendingJob() throws Exception;
     void deleteJobById(String jobId) throws Exception;
-
+    List<Job> listDLQ() throws Exception;
+    Optional<Job> findInDLQ(String id) throws Exception;
+    void deleteFromDLQ(String jobId) throws Exception;
 
 }
